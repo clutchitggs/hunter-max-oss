@@ -42,49 +42,88 @@ Output lands in `reports/deep_read/<host>_<timestamp>.md`.
 
 ## Quickstart — full pipeline
 
-Requires more setup (Discord webhook, Hetzner / DO VPS recommended for the long-running modes):
+Requires more setup (Discord webhook, ~2 GB VPS recommended for long-running modes):
 
 ```bash
 cp config.example.json config.json
-# Edit config.json — set anthropic_balance_usd, daily_budget_usd, Discord webhook
-python -m src.infinite_hunter
+# Edit config.json — set anthropic_balance_usd, daily budgets, Discord webhook
+python src/pipeline.py            # async, parallel — preferred
+# or:
+python -m src.infinite_hunter --loop   # sequential, legacy
 ```
 
-The pipeline runs forever, polling new-program feeds, scope changes, CVE feeds, M&A news, and rotating through registered targets.
+The pipeline runs forever, polling new-program feeds, scope changes, CVE feeds and M&A news, and rotating through registered targets.
 
 ---
 
-## Architecture (one screenful)
+## Architecture
+
+A target moves through four phases (recon → scan → map → test). Findings flow through a parallel AI triage chain. Background signal monitors inject prioritized targets into the queue.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  infinite_hunter — top-level scheduler                      │
-│   ├── program_scanner    new-program polling                │
-│   ├── scope_checker      scope-diff detection               │
-│   ├── cve_monitor        CVE → affected-target lookup       │
-│   ├── ma_recon           M&A news → newly-acquired targets  │
-│   └── orchestrator       pulls targets, drives the pipeline │
-└─────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌─────────────────────────────────────────────────────────────┐
-│  recon  →  vuln_scanner  →  evidence_enricher  →  AI tiers  │
-│                                                              │
-│   recon: subfinder, dns_checker, wayback, s3_enum,           │
-│          nuclei_runner, js_analyzer, deep_read               │
-│                                                              │
-│   AI tiers (cost-controlled, daily budget per tier):         │
-│     T1: GPT-4o-mini                triage                    │
-│     T2: Claude Sonnet              investigate               │
-│     T3: Claude Sonnet              challenge T2 reject       │
-│     T4: Claude Opus                final verdict             │
-│     T5: Claude Opus                challenge T4 reject       │
-│                                                              │
-│   approved findings → report_drafter → Discord notification  │
-└─────────────────────────────────────────────────────────────┘
+                   signal monitors
+                   ─────────────────
+    new-program (15m, prio 10)  ─┐
+    scope-change (6h,  prio 8)   │
+    CVE-race    (6h,  prio 8)    ├──► scan_queue ──► dispatcher
+    M&A feed    (12h, prio 6)    │
+    rotation    (idle, prio 3)  ─┘
+
+                                            ▼
+              ┌──────────── PER-TARGET PHASES ────────────┐
+              │                                            │
+              │  Phase 1  RECON                            │
+              │     subfinder · DNS / HTTP · wordlist      │
+              │     → live_hosts                           │
+              │                                            │
+              │  Phase 2  SCANNING                         │
+              │     nuclei · JS-secret scan · Wayback      │
+              │     · S3 enum                              │
+              │     → vuln findings                        │
+              │                                            │
+              │  Phase 3a MAPPING                          │
+              │     Katana deep crawl · Swagger / OpenAPI  │
+              │     / GraphQL probing · Deep Read          │
+              │     → api_schemas                          │
+              │                                            │
+              │  Phase 3b TESTING (ReAct agent)            │
+              │     Scout (Sonnet, fast, inline):          │
+              │       7-step ReAct, identifies BOLA /      │
+              │       Mass-Assignment / SSRF leads         │
+              │     Sniper (Opus, slow, decoupled worker): │
+              │       Object specialist (BOLA + Mass-Assn) │
+              │       Resource specialist (SSRF + OAST)    │
+              └────────────────────┬───────────────────────┘
+                                   │  vuln findings
+                                   ▼
+              ┌────────── AI TRIAGE (parallel) ────────────┐
+              │  T1  cheap LLM       triage                │
+              │  T2  Sonnet          investigate           │
+              │  T3  Sonnet          challenge T2 reject   │
+              │  T4  Opus            final verdict         │
+              │  T5  Opus            challenge T4 reject   │
+              └────────────────────┬───────────────────────┘
+                                   │  approved findings
+                                   ▼
+                    report_drafter ─► Discord notifier
 ```
 
-Each tier has its own daily budget cap. When all caps are hit the system stops new analysis until the next day or until the operator tops up.
+The async orchestrator (`pipeline.py`) caps each stage with a semaphore so a single 2 GB VPS doesn't get crushed by parallel work:
+
+| Stage   | Concurrency | Why |
+|---------|-------------|-----|
+| Recon   | 3           | DNS / HTTP — moderate RAM |
+| Scan    | 2           | nuclei is CPU-heavy |
+| Mapping | 1           | Katana is RAM-heavy |
+| Scout   | 3           | API-bound, fast |
+| Sniper  | 2           | Opus, slow + expensive |
+| AI triage | 5         | API-bound, low local cost |
+
+Max targets in flight: 5.
+
+The Scout-Sniper split is the key design rule: **fast tasks must never wait for slow tasks.** Scout runs inline in the per-target loop; Snipers run in a fully decoupled background worker that pulls from a `react_leads` table.
+
+Each AI tier has its own daily USD budget. When all caps are hit the system stops new analysis and pings Discord.
 
 ---
 
@@ -101,9 +140,14 @@ src/
 │   ├── analyzer.py        LLM hypothesis ranking + kill-rules
 │   └── report.py          markdown report writer
 │
-├── infinite_hunter.py     top-level scheduler
-├── orchestrator.py        per-target pipeline driver
-├── ai_analyzer.py         tiered LLM review
+├── pipeline.py            async pipeline orchestrator (preferred entry point)
+├── infinite_hunter.py     legacy sequential scheduler
+├── orchestrator.py        per-target phase driver
+├── api_mapper.py          Phase 3a — Katana + spec discovery
+├── react_agent.py         Phase 3b — Scout + Sniper ReAct testing
+├── sniper_object.py       Sniper specialist: BOLA + Mass Assignment
+├── sniper_resource.py     Sniper specialist: SSRF + OAST callbacks
+├── ai_analyzer.py         tiered LLM review (T1–T5)
 ├── llm_client.py          unified Anthropic / OpenAI client
 ├── nuclei_runner.py       nuclei integration
 ├── js_analyzer.py         JS-bundle secret/endpoint extraction
@@ -155,6 +199,8 @@ This software is intended **only** for authorized security research:
 Running this against systems you do not have written permission to test is illegal under most computer-misuse laws (Israel: Computer Law 1995 §2/§4; US: CFAA 18 USC §1030; UK: Computer Misuse Act 1990; EU: NIS2 / national equivalents).
 
 Configure scope checks before pointing the pipeline at anything. **The author assumes no liability for misuse.**
+
+The author is an approved participant in the Anthropic Cyber Verification Program, vetting LLM-augmented offensive-security research.
 
 ---
 
