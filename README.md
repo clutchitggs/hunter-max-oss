@@ -8,6 +8,8 @@ A bug-bounty research framework. Two pieces:
 
 > ⚠️ **For authorized security research only.** Read [the disclaimer](#disclaimer) before using.
 
+> 📦 **About this repo.** This is the public, sanitized distribution of the framework. Day-to-day development happens in a private repository where active engagement findings under bug-bounty disclosure terms are kept; this open-source release is intentionally a fresh history without operational context.
+
 ---
 
 ## What makes Deep Read different
