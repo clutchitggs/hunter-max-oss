@@ -4,11 +4,13 @@ A bug-bounty research framework. Two pieces:
 
 1. **Deep Read** — a recon module that fetches the JavaScript bundles of a single-page app (including webpack Module Federation chunks the rest of the SPA loads at runtime), extracts the API surface from the minified code, and ranks the discovered endpoints by attack potential using an LLM.
 
-2. **Hunter pipeline** — a multi-tier scanning pipeline that watches public bug-bounty programs for newly-launched scope, runs nuclei templates and JS analysis against live hosts, escalates interesting findings through tiered LLM review (cheap triage → Sonnet investigation → Opus verdict), and posts to Discord.
+2. **Hunter pipeline** — an async, priority-driven scanner that watches public bug-bounty programs for newly-launched scope, runs nuclei + JS analysis + Scout-Sniper agent testing on live hosts, runs cheap HTTP-only enrichment to kill false positives before any LLM gets involved, then escalates the survivors through a five-tier LLM review and posts to Discord for **human verification**.
 
 > ⚠️ **For authorized security research only.** Read [the disclaimer](#disclaimer) before using.
 
 > 📦 **About this repo.** This is the public, sanitized distribution of the framework. Day-to-day development happens in a private repository where active engagement findings under bug-bounty disclosure terms are kept; this open-source release is intentionally a fresh history without operational context.
+
+> 🧭 **Design rule — the pipeline filters, humans verify, then submit.** No finding leaves Discord and reaches a bug-bounty triager without a human running the live verification step manually. The whole AI pipeline is a noise filter, not an autonomous submitter.
 
 ---
 
@@ -60,7 +62,7 @@ The pipeline runs forever, polling new-program feeds, scope changes, CVE feeds a
 
 ## Architecture
 
-A target moves through four phases (recon → scan → map → test). Findings flow through a parallel AI triage chain. Background signal monitors inject prioritized targets into the queue.
+A target moves through four phases (recon → scan → map → test). Findings then go through a free HTTP-only enrichment layer before any LLM sees them, and only the survivors enter the five-tier AI review.
 
 ```
                    signal monitors
@@ -98,6 +100,21 @@ A target moves through four phases (recon → scan → map → test). Findings f
               └────────────────────┬───────────────────────┘
                                    │  vuln findings
                                    ▼
+              ┌──────────── EVIDENCE ENRICHMENT ───────────┐
+              │   HTTP-only verification, $0 cost          │
+              │     CORS reflection re-check               │
+              │     Spring actuator content-type check     │
+              │     SPA catch-all detection (no, that 200  │
+              │       you're seeing is not a real bug)     │
+              │     GraphQL / Swagger / debug live-probe   │
+              │     JS-secret token validation             │
+              │     S3 bucket ownership probe              │
+              │   Auto-verdicts: confirmed | false_positive│
+              │   Findings auto-rejected here NEVER reach  │
+              │   the LLM tiers.                           │
+              └────────────────────┬───────────────────────┘
+                                   │  surviving findings
+                                   ▼
               ┌─────────── AI TRIAGE (per finding) ────────┐
               │  T1  cheap LLM       triage                │
               │  T2  Sonnet          investigate           │
@@ -108,6 +125,14 @@ A target moves through four phases (recon → scan → map → test). Findings f
                                    │  approved findings
                                    ▼
                     report_drafter ─► Discord notifier
+                                   │
+                                   ▼
+                          ┌──── HUMAN ────┐
+                          │  manual live  │
+                          │  verification │
+                          │  before any   │
+                          │  submission   │
+                          └───────────────┘
 ```
 
 Within one finding the tiers run **sequentially** (each waits for the previous). Across findings the orchestrator runs up to 5 chains **concurrently**, gated by an `asyncio.Semaphore`.
@@ -147,26 +172,53 @@ src/
 ├── pipeline.py            async pipeline orchestrator (preferred entry point)
 ├── infinite_hunter.py     legacy sequential scheduler
 ├── orchestrator.py        per-target phase driver
-├── api_mapper.py          Phase 3a — Katana + spec discovery
-├── react_agent.py         Phase 3b — Scout + Sniper ReAct testing
+│
+│   # Phase 1 — recon
+├── dns_checker.py         DNS / HTTP liveness probes
+├── wayback.py             Wayback Machine URL harvest
+├── s3_enum.py             S3 bucket enumeration + ownership probe
+│
+│   # Phase 2 — scanning
+├── nuclei_runner.py       nuclei integration
+├── js_analyzer.py         JS-bundle secret + endpoint extraction
+├── vuln_scanner.py        misc. vulnerability checks
+│
+│   # Phase 3a — mapping
+├── api_mapper.py          Katana deep-crawl + spec discovery
+│
+│   # Phase 3b — agentic testing
+├── react_agent.py         Scout + Sniper ReAct orchestration
+├── scout_agent.py         Scout (Sonnet, ReAct, 7-step lead identification)
 ├── sniper_object.py       Sniper specialist: BOLA + Mass Assignment
 ├── sniper_resource.py     Sniper specialist: SSRF + OAST callbacks
+├── oast_client.py         OAST / interact.sh client for blind SSRF
+│
+│   # Verification + AI triage
+├── evidence_enricher.py   HTTP-only verification, auto-verdicts before LLM
 ├── ai_analyzer.py         tiered LLM review (T1–T5)
-├── llm_client.py          unified Anthropic / OpenAI client
-├── nuclei_runner.py       nuclei integration
-├── js_analyzer.py         JS-bundle secret/endpoint extraction
+├── llm_client.py          unified Anthropic / OpenAI client + budget
+│
+│   # Signals + scope
 ├── program_scanner.py     bug-bounty platform polling
 ├── scope_checker.py       scope-diff detection
 ├── scope_importer.py      scope import from various platforms
 ├── cve_monitor.py         CVE → affected-target lookup
 ├── ma_recon.py            M&A news → newly-acquired-asset recon
 ├── target_scorer.py       target prioritisation
+│
+│   # Output
+├── report_drafter.py      markdown report drafting
+├── notifier.py            generic notification dispatcher
 ├── notifier_discord.py    Discord webhook notifier
 ├── dashboard.py           local Flask status dashboard
-└── …
+├── db.py                  SQLite layer (targets, findings, react_leads, …)
+└── deep_read/             see Deep Read section above
 
 data/
 └── wordlist.txt           small built-in wordlist
+
+templates/                 Flask dashboard templates
+static/                    Flask dashboard CSS
 
 requirements.txt
 config.example.json
