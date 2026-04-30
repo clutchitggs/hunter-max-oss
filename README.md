@@ -96,7 +96,7 @@ A target moves through four phases (recon → scan → map → test). Findings f
               └────────────────────┬───────────────────────┘
                                    │  vuln findings
                                    ▼
-              ┌────────── AI TRIAGE (parallel) ────────────┐
+              ┌─────────── AI TRIAGE (per finding) ────────┐
               │  T1  cheap LLM       triage                │
               │  T2  Sonnet          investigate           │
               │  T3  Sonnet          challenge T2 reject   │
@@ -108,7 +108,9 @@ A target moves through four phases (recon → scan → map → test). Findings f
                     report_drafter ─► Discord notifier
 ```
 
-The async orchestrator (`pipeline.py`) caps each stage with a semaphore so a single 2 GB VPS doesn't get crushed by parallel work:
+Within one finding the tiers run **sequentially** (each waits for the previous). Across findings the orchestrator runs up to 5 chains **concurrently**, gated by an `asyncio.Semaphore`.
+
+Each pipeline stage has its own semaphore cap so a single 2 GB VPS doesn't get crushed by parallel work:
 
 | Stage   | Concurrency | Why |
 |---------|-------------|-----|
