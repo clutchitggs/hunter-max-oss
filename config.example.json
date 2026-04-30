@@ -1,0 +1,30 @@
+{
+  "feeds": [
+    "https://news.google.com/rss/search?q=acquisition+OR+acquires+OR+merger&hl=en-US&gl=US&ceid=US:en"
+  ],
+  "acquisition_keywords": [
+    "acquires", "acquired", "acquisition", "acquire",
+    "merger", "merges with", "to buy", "has agreed to buy",
+    "completed its purchase", "takeover"
+  ],
+  "llm": {
+    "provider": "anthropic",
+    "api_key_env": "ANTHROPIC_API_KEY",
+    "anthropic_balance_usd": 0.00,
+    "stop_at_remaining_usd": 1.00,
+    "_help": "Set anthropic_balance_usd to your current balance. The pipeline will stop new AI calls when remaining balance hits stop_at_remaining_usd."
+  },
+  "tiers": {
+    "tier1": {"enabled": true, "daily_budget_usd": 0.50, "_note": "GPT-4o-mini — triage"},
+    "tier2": {"enabled": true, "daily_budget_usd": 2.00, "_note": "Claude Sonnet — investigate / chain"},
+    "tier3": {"enabled": true, "daily_budget_usd": 3.00, "_note": "Claude Opus — final verdicts and Deep Read"}
+  },
+  "signals": {
+    "new_program_interval_min": 15,
+    "scope_change_interval_hours": 6,
+    "cve_check_interval_hours": 6,
+    "m_and_a_interval_hours": 12,
+    "rotation_rescan_days": 7
+  },
+  "discord_webhook": "https://discord.com/api/webhooks/REPLACE_ME"
+}

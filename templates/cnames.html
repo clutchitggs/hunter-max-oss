@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>CNAME Map</h1>
+<p style="color:#8b949e">All CNAME records discovered across scanned targets. Dangling records are highlighted.</p>
+
+<div class="stats">
+    <div class="stat-card"><div class="label">Total CNAMEs</div><div class="value blue">{{ stats.total_cnames }}</div></div>
+    <div class="stat-card"><div class="label">Dangling</div><div class="value red">{{ stats.dangling }}</div></div>
+    <div class="stat-card"><div class="label">Subdomains Checked</div><div class="value">{{ stats.total_subs }}</div></div>
+</div>
+
+{% if cnames %}
+<table>
+    <tr><th>Subdomain</th><th>CNAME Target</th><th>Provider</th><th>Dangling?</th><th>Parent Domain</th><th>Checked</th></tr>
+    {% for c in cnames %}
+    <tr style="{{ 'background:#1a3a1a' if c.is_dangling else '' }}">
+        <td><code>{{ c.subdomain }}</code></td>
+        <td><code>{{ c.cname_target }}</code></td>
+        <td>{{ c.provider or '-' }}</td>
+        <td>{% if c.is_dangling %}<span class="badge" style="background:#f8514933;color:#f85149">DANGLING</span>{% else %}-{% endif %}</td>
+        <td>{{ c.domain or '-' }}</td>
+        <td>{{ c.checked_at[:16] if c.checked_at else '-' }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p style="margin-top:24px;color:#8b949e">No CNAME records discovered yet. Scanner is processing targets.</p>
+{% endif %}
+{% endblock %}

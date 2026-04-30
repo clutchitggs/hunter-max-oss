@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Targets</h1>
+
+<div class="filters">
+    <a href="{{ url_for('targets_list') }}" class="filter-tab {{ 'active' if not current_filter }}">All</a>
+    <a href="{{ url_for('targets_list', scope='in_scope') }}" class="filter-tab {{ 'active' if current_filter == 'in_scope' }}">In-Scope</a>
+    <a href="{{ url_for('targets_list', scope='pending') }}" class="filter-tab {{ 'active' if current_filter == 'pending' }}">Pending</a>
+    <a href="{{ url_for('targets_list', scope='out_of_scope') }}" class="filter-tab {{ 'active' if current_filter == 'out_of_scope' }}">Out-of-Scope</a>
+</div>
+
+{% if targets %}
+<table>
+    <tr><th>#</th><th>Domain</th><th>Scope</th><th>Platform</th><th>Program</th><th>Added</th></tr>
+    {% for t in targets %}
+    <tr>
+        <td>{{ t.id }}</td>
+        <td><code>{{ t.domain }}</code></td>
+        <td><span class="badge {{ t.scope_status }}">{{ t.scope_status }}</span></td>
+        <td>{{ t.program_platform or '-' }}</td>
+        <td>{% if t.program_url %}<a href="{{ t.program_url }}" target="_blank">Link</a>{% else %}-{% endif %}</td>
+        <td>{{ t.created_at[:10] if t.created_at else '-' }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p style="margin-top:24px; color:#8b949e">No targets{% if current_filter %} with scope "{{ current_filter }}"{% endif %}.</p>
+{% endif %}
+{% endblock %}

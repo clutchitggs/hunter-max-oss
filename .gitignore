@@ -1,0 +1,33 @@
+# local config (operator-specific, may contain budgets / handles)
+config.json
+
+# secrets — never commit
+credentials.json
+.env
+*.pem
+*.key
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# operational output
+reports/
+data/scans/
+data/bundles/
+data/cache/
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db

@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Acquisitions</h1>
+
+{% if acquisitions %}
+<table>
+    <tr><th>#</th><th>Headline</th><th>Acquirer</th><th>Target</th><th>Domain</th><th>Date</th></tr>
+    {% for a in acquisitions %}
+    <tr>
+        <td>{{ a.id }}</td>
+        <td style="max-width:400px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">
+            <a href="{{ a.link }}" target="_blank">{{ a.title[:80] }}</a>
+        </td>
+        <td>{{ a.acquirer or '-' }}</td>
+        <td>{{ a.target_company or '-' }}</td>
+        <td>{% if a.target_domain %}<code>{{ a.target_domain }}</code>{% else %}-{% endif %}</td>
+        <td>{{ a.published[:10] if a.published else a.discovered_at[:10] }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p style="margin-top:24px; color:#8b949e">No acquisitions found yet. Run the orchestrator to crawl feeds.</p>
+{% endif %}
+{% endblock %}

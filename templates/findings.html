@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Findings</h1>
+
+<div class="filters">
+    <a href="{{ url_for('findings_list') }}" class="filter-tab {{ 'active' if not current_filter }}">All</a>
+    <a href="{{ url_for('findings_list', status='new') }}" class="filter-tab {{ 'active' if current_filter == 'new' }}">New</a>
+    <a href="{{ url_for('findings_list', status='alerted') }}" class="filter-tab {{ 'active' if current_filter == 'alerted' }}">Alerted</a>
+    <a href="{{ url_for('findings_list', status='approved') }}" class="filter-tab {{ 'active' if current_filter == 'approved' }}">Approved</a>
+    <a href="{{ url_for('findings_list', status='skipped') }}" class="filter-tab {{ 'active' if current_filter == 'skipped' }}">Skipped</a>
+</div>
+
+{% if findings %}
+<table>
+    <tr><th>#</th><th>Subdomain</th><th>CNAME</th><th>Provider</th><th>Severity</th><th>Status</th><th>Actions</th></tr>
+    {% for f in findings %}
+    <tr>
+        <td>{{ f.id }}</td>
+        <td><a href="{{ url_for('finding_detail', fid=f.id) }}"><code>{{ f.subdomain }}</code></a></td>
+        <td><code>{{ f.cname_target }}</code></td>
+        <td>{{ f.provider }}</td>
+        <td>{{ f.severity }}</td>
+        <td><span class="badge {{ f.status }}">{{ f.status }}</span></td>
+        <td>
+            {% if f.status in ('new', 'alerted') %}
+            <form method="post" action="{{ url_for('approve_finding', fid=f.id) }}" style="display:inline">
+                <button class="btn btn-approve" type="submit">Approve</button>
+            </form>
+            <form method="post" action="{{ url_for('skip_finding', fid=f.id) }}" style="display:inline">
+                <button class="btn btn-skip" type="submit">Skip</button>
+            </form>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+{% else %}
+<p style="margin-top:24px; color:#8b949e">No findings{% if current_filter %} with status "{{ current_filter }}"{% endif %}. Run the orchestrator to scan targets.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hunter-Max v10</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta http-equiv="refresh" content="30">
+</head>
+<body>
+    <nav>
+        <span class="brand">HUNTER-MAX v10</span>
+        <a href="{{ url_for('index') }}">Dashboard</a>
+        <a href="{{ url_for('findings_list') }}">Findings</a>
+        <a href="{{ url_for('cnames_list') }}">CNAME Map</a>
+        <a href="{{ url_for('targets_list') }}">Targets</a>
+        <a href="{{ url_for('acquisitions_list') }}">Acquisitions</a>
+    </nav>
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

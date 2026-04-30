@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Finding #{{ f.id }}</h1>
+
+<table>
+    <tr><th style="width:150px">Subdomain</th><td><code>{{ f.subdomain }}</code></td></tr>
+    <tr><th>CNAME Target</th><td><code>{{ f.cname_target }}</code></td></tr>
+    <tr><th>Provider</th><td>{{ f.provider }}</td></tr>
+    <tr><th>Fingerprint</th><td><code>{{ f.fingerprint }}</code></td></tr>
+    <tr><th>Severity</th><td>{{ f.severity }}</td></tr>
+    <tr><th>Target Domain</th><td>{{ f.target_domain or 'N/A' }}</td></tr>
+    <tr><th>Platform</th><td>{{ f.program_platform or 'N/A' }}</td></tr>
+    <tr><th>Program URL</th><td>{% if f.program_url %}<a href="{{ f.program_url }}" target="_blank">{{ f.program_url }}</a>{% else %}N/A{% endif %}</td></tr>
+    <tr><th>Status</th><td><span class="badge {{ f.status }}">{{ f.status }}</span></td></tr>
+    <tr><th>Discovered</th><td>{{ f.created_at }}</td></tr>
+</table>
+
+{% if f.status in ('new', 'alerted') %}
+<div class="btn-group">
+    <form method="post" action="{{ url_for('approve_finding', fid=f.id) }}">
+        <button class="btn btn-approve" type="submit">Approve</button>
+    </form>
+    <form method="post" action="{{ url_for('skip_finding', fid=f.id) }}">
+        <button class="btn btn-skip" type="submit">Skip</button>
+    </form>
+</div>
+{% endif %}
+
+<h2>Report Preview</h2>
+<div class="report-preview">{{ f.report_md or 'No report generated yet. Run the orchestrator to draft reports.' }}</div>
+{% endblock %}
