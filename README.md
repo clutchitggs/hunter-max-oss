@@ -23,8 +23,8 @@ The output is a markdown report — endpoints, hypotheses, supporting evidence �
 ## Quickstart — Deep Read only
 
 ```bash
-git clone https://github.com/clutchitggs/hunter-max.git
-cd hunter-max
+git clone https://github.com/clutchitggs/hunter-max-oss.git
+cd hunter-max-oss
 python -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
