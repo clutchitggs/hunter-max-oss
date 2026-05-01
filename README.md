@@ -55,6 +55,21 @@ Output lands in `reports/deep_read/<host>_<timestamp>.md`.
 
 ---
 
+## Production deployment
+
+The full pipeline is designed to run as a long-lived daemon. Tested on a 2 GB DigitalOcean VPS running Ubuntu 24.04; works similarly on Hetzner, Linode, or any small cloud instance.
+
+Recommended setup:
+
+- Run the entry script under `systemd` with `Restart=always` so the pipeline auto-recovers from transient errors. Keep `systemctl stop` for clean halts.
+- Persist the SQLite database on a mounted volume; logs go to `logs/hunter.log` — rotate via `logrotate`.
+- Set `discord_webhook` in `config.json` so findings get notified.
+- Use `tmux` / `screen` only for one-off Deep Read runs; the full pipeline belongs under a service manager.
+
+Per-target memory footprint is small (LLM calls dominate cost, not RAM); a 2 GB instance comfortably handles concurrent recon and analysis with the documented semaphore caps.
+
+---
+
 ## Earlier architecture (kept in the repo, no longer the active path)
 
 This project started as a bigger system: an async multi-stage pipeline with subdomain recon, nuclei scanning, JS-secret detection, a Scout-Sniper ReAct agent for active testing, a five-tier LLM review (T1 cheap triage → T2/T3 Sonnet investigate/challenge → T4/T5 Opus verdict/challenge), an HTTP-only enrichment layer producing auto-verdicts before any LLM saw a finding, and Discord notifications.
