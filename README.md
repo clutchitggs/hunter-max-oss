@@ -1,4 +1,9 @@
-# hunter-max
+# hunter-max-oss
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&logoColor=white)](#)
+[![Anthropic CVP](https://img.shields.io/badge/Anthropic-Cyber%20Verification%20Program-D4A27F)](https://www.anthropic.com/)
+[![Use](https://img.shields.io/badge/use-authorized%20research%20only-red)](#disclaimer)
 
 Bug-bounty recon tool for single-page apps. Pulls the JavaScript bundles a SPA loads at runtime, extracts every API endpoint hidden in them, asks an LLM which ones look attackable, and writes a markdown report you can verify by hand.
 
@@ -7,6 +12,8 @@ Bug-bounty recon tool for single-page apps. Pulls the JavaScript bundles a SPA l
 > 📦 **About this repo.** Public, sanitized mirror of a private dev tree where active engagement findings are kept under bug-bounty disclosure terms. Fresh commit history is intentional.
 
 > 🧭 **Design rule — the tool finds, the human submits.** No report leaves Discord without a person running the live verification step manually. The pipeline is a noise filter, not an autonomous submitter.
+
+> 🛡️ **Anthropic Cyber Verification Program approved.** The author is a vetted participant in Anthropic's program for LLM-augmented offensive-security research.
 
 ---
 
@@ -67,6 +74,20 @@ Recommended setup:
 - Use `tmux` / `screen` only for one-off Deep Read runs; the full pipeline belongs under a service manager.
 
 Per-target memory footprint is small (LLM calls dominate cost, not RAM); a 2 GB instance comfortably handles concurrent recon and analysis with the documented semaphore caps.
+
+---
+
+## Real-world testing
+
+The tool has been used against multiple authorized targets via Bugcrowd. The honest summary:
+
+- **Aiven** (`regatta.aiven.io` / `admin-api.aiven.io` / managed PostgreSQL). Eleven attack vectors investigated across configuration leaks, admin-API auth boundaries, undocumented endpoints, OpenAPI exposure, Okta flows, PostgreSQL privilege escalation, SECURITY DEFINER source audit, autovacuum traps, and SSRF from inside the database container. **Outcome:** every claimed bypass collapsed under careful verification — the 401→403 differential turned out to be shared-IdP architecture working as designed, the unauthenticated endpoint validated against the production DB but leaked no records, the `aiven_extras` extension code was clean, and PG17 enforces the IMMUTABLE contract that older PoCs relied on. The exposed OpenAPI spec was a clean P4/P5 information-disclosure finding but didn't justify a standalone report. **Closed without submission.**
+
+- **Cloudinary**. Submitted to Bugcrowd. The candidate finding reproduced on a single-account scenario but did not survive cross-account testing — the platform's tenant isolation held. **Closed as theoretical.**
+
+**Net result: zero confirmed bugs, several lessons.** Mature DBaaS / SaaS platforms put their best engineering into tenant isolation and shared-IdP boundaries — that's the strongest wall in the fortress. The high-ROI surface is internal admin tooling, undocumented endpoints discovered via JS bundle analysis (this is what Deep Read is built for), and recently-deployed SaaS where defenses haven't fully matured yet. The kill-list now drops the "looks like a bug, isn't" patterns these engagements identified.
+
+This honest-failure log is the reason I trust the tool's output now: when Deep Read flags something, the kill-list has already eaten the false positives it has historically suggested.
 
 ---
 
